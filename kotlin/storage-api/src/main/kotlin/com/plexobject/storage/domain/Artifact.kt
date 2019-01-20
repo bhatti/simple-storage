@@ -7,17 +7,10 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize
 import com.fasterxml.jackson.databind.ser.std.DateSerializer
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import org.apache.commons.lang3.StringUtils
-import org.springframework.data.jpa.domain.Specification
 import org.springframework.data.util.ProxyUtils
 import java.io.Serializable
-import java.time.Instant
-import java.time.format.DateTimeFormatter
 import java.util.*
 import javax.persistence.*
-import javax.persistence.criteria.CriteriaBuilder
-import javax.persistence.criteria.CriteriaQuery
-import javax.persistence.criteria.Predicate
-import javax.persistence.criteria.Root
 
 
 @Entity
@@ -136,6 +129,17 @@ open class Artifact(
         return "${application}:${job}:${name}"
     }
 
+    fun update(other: Artifact) {
+        userAgent = other.userAgent
+        size = other.size
+        contentType = other.contentType
+        platform = other.platform
+        digest = other.digest
+        mergeLabels(other)
+        properties.clear()
+        properties.addAll(other.properties)
+    }
+
     fun validate() {
         check(size > 0) { "size must be greater than zero." }
         check(application.isNotEmpty()) { "application is not specified." }
@@ -212,7 +216,7 @@ open class Artifact(
         fun filterProperties(props: Map<String, String>): Map<String, String> {
             val fieldsRegex = Regex("(app|application|job|name|platform|contentType|overwrite|label|labels|createdAt|updatedAt|size|url|userAgent|digest)", RegexOption.IGNORE_CASE)
             var newProps = TreeMap<String, String>()
-            props.forEach { k,v ->
+            props.forEach { k, v ->
                 if (!fieldsRegex.matches(k)) { // containsMatchIn
                     newProps.put(k, v)
                 }
@@ -223,104 +227,13 @@ open class Artifact(
         private fun normalize(str: String): String {
             return str.replace("[^A-Za-z0-9 ._]/", "_");
         }
+
         fun toKey(application: String, job: String, name: String): String {
             check(application.isNotEmpty()) { "application is not specified." }
             check(job.isNotEmpty()) { "job is not specified." }
             check(name.isNotEmpty()) { "name is not specified." }
             return "${normalize(application)}/${normalize(job)}/${normalize(name)}"
         }
-    }
-}
-
-/*
-@Embeddable
-data class ArtifactLabels(
-        @NotNull
-        @get:Column(name = "labels", nullable = false)
-        var values: Array<String> = arrayOf()
-) : Serializable {
-    fun merge(other: ArtifactLabels) {
-        merge(*other.values)
-    }
-
-    fun merge(vararg other: String) {
-        val all = HashSet<String>()
-        all.addAll(other.toList())
-        all.addAll(values.toList())
-        val list = ArrayList<String>(all)
-        this.values = list.toTypedArray()
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as ArtifactLabels
-
-        if (!values.contentEquals(other.values)) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        return values.contentHashCode()
-    }
-
-    override fun toString(): String {
-        val set = TreeSet<String>()
-        set.addAll(values.toList())
-        return set.toString()
-    }
-
-
-    companion object {
-        fun fromString(str: String): ArtifactLabels {
-            val toks = ArrayList<String>(HashSet<String>(
-                    str.split(",").filter { s -> s.isNotEmpty() }.map { s -> s.trim() })).toTypedArray()
-            return ArtifactLabels(toks)
-        }
-    }
-}
-*/
-
-@Entity
-@Table(name = "properties")
-open class ArtifactProperty(
-        @get:ManyToOne(fetch = FetchType.LAZY)
-        @get:JoinColumn(name = "artifact_id", updatable = false)
-        @JsonIgnore
-        open var artifact: Artifact? = null,
-
-        @get:Id
-        open var id: String = "",
-
-        @get:Column(nullable = false) //, insertable = true, updatable = false)
-        open var name: String = "",
-
-        @get:Column(nullable = false) //, insertable = true, updatable = false)
-        open var value: String = "",
-
-        @get:Column(name = "created_at", nullable = true)
-        open var createdAt: Date = Date()
-) : Serializable {
-
-    override fun toString(): String {
-        return "${name}=${value}"
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as ArtifactProperty
-
-        if (id != other.id) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        return id.hashCode()
     }
 }
 
@@ -340,68 +253,3 @@ class PropertySerializer @JvmOverloads constructor(t: Class<Set<ArtifactProperty
 }
 
 
-data class ArtifactSpecification(val pq: PaginatedQuery) : Specification<Artifact> {
-    fun and(builder: CriteriaBuilder, first: Predicate?, second: Predicate): Predicate {
-        first?.let {
-            return builder.and(it, second)
-        }
-        return second
-    }
-
-    fun or(builder: CriteriaBuilder, first: Predicate?, second: Predicate): Predicate {
-        first?.let {
-            return builder.or(it, second)
-        }
-        return second
-    }
-
-    override fun toPredicate(root: Root<Artifact>, query: CriteriaQuery<*>, builder: CriteriaBuilder): Predicate? {
-        var topPredicate: Predicate? = null
-        val application: String? = pq.params.get("application") ?: pq.params.get("app")
-        val job: String? = pq.params.get("job")
-        val name: String? = pq.params.get("name")
-        val platform: String? = pq.params.get("platform")
-        val userAgent: String? = pq.params.get("userAgent")
-        val digest: String? = pq.params.get("digest")
-        var since: Date? = null
-        pq.params.get("since")?.let {
-            val accessor = DateTimeFormatter.ISO_DATE_TIME.parse(it)
-            since = Date.from(Instant.from(accessor))
-            //val dt: LocalDateTime = OffsetDateTime.parse(it, DateTimeFormatter.ISO_DATE_TIME).toLocalDateTime()
-            //since = Date.from(dt.atZone(ZoneId.systemDefault()).toInstant());
-        }
-        val labels: String? = pq.params.get("labels") ?: pq.params.get("label")
-
-        application?.let {
-            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.application), it))
-        }
-        job?.let {
-            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.job), it))
-        }
-        userAgent?.let {
-            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.userAgent), it))
-        }
-        platform?.let {
-            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.platform), it.toUpperCase()))
-        }
-        digest?.let {
-            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.digest), it.toLowerCase()))
-        }
-        name?.let {
-            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.name), it))
-        }
-        since?.let {
-            topPredicate = and(builder, topPredicate, builder.greaterThanOrEqualTo(root.get<Date>(Artifact.createdAt), it))
-        }
-        labels?.let {
-            val values = it.toLowerCase().split(",").map { it.trim() }.filter { it.isNotEmpty() }
-            var labelPredicate: Predicate? = null
-            for (i in 0..values.size - 1) {
-                val value = values[i]
-                labelPredicate = or(builder, labelPredicate, builder.like(root.get<String>(Artifact.labels), "%$value%"))
-            }
-            topPredicate = and(builder, topPredicate, labelPredicate!!)
-        }
-        return topPredicate
-    }
-}

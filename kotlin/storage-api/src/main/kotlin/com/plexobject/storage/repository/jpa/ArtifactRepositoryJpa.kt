@@ -63,9 +63,7 @@ open class ArtifactRepositoryJpa(
             if (!overwrite) {
                 throw DuplicateException("Already exist artifact with app ${entity.application}, job ${entity.job}, name ${entity.name}")
             }
-            old.mergeLabels(entity)
-            old.properties.clear()
-            old.properties.addAll(entity.properties)
+            old.update(entity)
             return super.save(old)
         } catch (e: NotFoundException) {
             return super.save(entity)
