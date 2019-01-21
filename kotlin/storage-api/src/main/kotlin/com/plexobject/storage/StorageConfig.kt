@@ -1,13 +1,20 @@
 package com.plexobject.storage
 
 
+import com.google.common.base.Preconditions
+import com.plexobject.storage.graphql.Query
+import com.plexobject.storage.graphql.Scalars
 import com.plexobject.storage.util.S3Helper
 import com.zaxxer.hikari.HikariDataSource
+import graphql.schema.GraphQLSchema
+import com.coxautodev.graphql.tools.SchemaParser
+import com.plexobject.storage.api.GraphQLEndpoint
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
+import org.springframework.boot.web.servlet.ServletRegistrationBean
 import org.springframework.context.annotation.*
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.springframework.transaction.annotation.EnableTransactionManagement
@@ -49,6 +56,22 @@ open class StorageConfig : InitializingBean {
     var s3AccessKeyId = ""
     @Value("\${s3.secretAccessKey}")
     var s3SecretAccessKey = ""
+    @Autowired
+    lateinit var query: Query
+    @Autowired
+    lateinit var graphQLEndpoint: GraphQLEndpoint
+
+    @Bean
+    open fun graphQLSchema(): GraphQLSchema {
+        Preconditions.checkNotNull(query, "query is not defined")
+        return SchemaParser.newParser().file("schema.graphqls").resolvers(query).scalars(Scalars.dateTime)
+                .build().makeExecutableSchema()
+    }
+
+    @Bean
+    open fun graphQLServletRegistrationBean(): ServletRegistrationBean<*> {
+        return ServletRegistrationBean(graphQLEndpoint, "/api/gq")
+    }
 
     @Bean
     open fun s3Helper(): S3Helper {

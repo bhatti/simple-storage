@@ -86,11 +86,18 @@ dependencies {
 
   compile group: 'com.amazonaws', name: 'aws-java-sdk-s3', version: '1.11.318'
 
+  compile('com.graphql-java:graphql-java:3.0.0')
+  compile('com.graphql-java:graphql-java-tools:3.2.0')
+  compile('com.graphql-java:graphql-java-servlet:4.0.0')
   compile('org.springframework.boot:spring-boot-starter-data-jpa')
   compile('org.springframework.boot:spring-boot-starter-web')
+  //compile('org.springframework:spring-web:4.3.8.RELEASE')
+  compile('org.springframework.boot:spring-boot-starter-security')
+  compile group: 'org.springframework.security', name: 'spring-security-messaging', version: '4.2.3.RELEASE'
+
   compile group: 'org.hibernate', name: 'hibernate-entitymanager', version: '5.4.0.Final'
   compile group: 'c3p0', name: 'c3p0', version: '0.9.1.2'
-
+  compile group: 'io.jsonwebtoken', name: 'jjwt', version: '0.7.0'
   //testCompile 'junit:junit:4.12'
   //testCompile "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
   //testCompile('org.springframework.boot:spring-boot-starter-test')

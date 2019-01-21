@@ -1,5 +1,5 @@
 # simple-storage
-Simple implementation for storing metadata on top of S3 or compatible file storage
+A simple REST/GraphQL based service for storing metadata on top of S3 or compatible file storage.
 
 ## Dependencies
  - Java 1.8
@@ -21,8 +21,8 @@ export S3_PREFIX=temps
 export S3_REGION=
 export S3_ENDPOINT=http://127.0.0.1:9000
 export S3_EXPIRE_MINUTES=1000
-export AWS_ACCESS_KEY_ID=FGVKVN4XMIAQD68DH55S
-export AWS_SECRET_ACCESS_KEY=Um30rBGfXZLJnpO9tZ1UK0woAfi+GFJsrq0JM4Rp
+export AWS_ACCESS_KEY_ID=See Minio logs
+export AWS_SECRET_ACCESS_KEY=See Minio logs
 ```
 
 ## Start server
@@ -32,9 +32,11 @@ export AWS_SECRET_ACCESS_KEY=Um30rBGfXZLJnpO9tZ1UK0woAfi+GFJsrq0JM4Rp
 
 ## Data structure
 Each file is stored as artifact with following attributes:
-- app: application name for the artifact
-- job: job/group for the artifact
+- organization: organization name/id for the artifact
+- system: system name/id for the artifact
+- subsystem: subsystem/job/group for the artifact
 - name : name of the artifact
+- username: username for the artifact
 - contentType: contentType of the artifact
 - size : size of the artifact
 - platform: platform of the artifact
@@ -43,51 +45,89 @@ Each file is stored as artifact with following attributes:
 - labels: list of searchable lables
 - properties: dictionary of user-defined properties (string type)
 
+**Note:** Combination of organization, system, subsystem and name should be globally unique.
+
 ## APIs
 
 ### Upload File
 Create multipart file
 ```
-curl -F "labels=search1,search2" -F "prop1=value1" -F "file=@/home/user1/Desktop/test.jpg" http://localhost:8080/api/myapp/myjob
+curl -F "labels=search1,search2" -F "prop1=value1" -F "file=@test.jpg" http://localhost:8080/api/myorg/bigsystem/job1
 ```
 returns
 ```
-{"application":"myapp","job":"myjob","name":"test.jpg","digest":"f30fd","platform":null,"contentType":"application/octet-stream","size":34516,"url":"http://127.0.0.1:9000/artifacts/temps/myapp/myjob/frog.png?X-Am..","userAgent":"curl/7.52.1","createdAt":"2019-01-20T05:04:10.508+0000","updatedAt":"2019-01-20T05:04:10.508+0000","labels":["search1","search2"],"properties":{"prop1":"value1"},"id":"myapp/myjob/test.jpg"}
+{"organization":"myorg","system":"bigsystem","subsystem":"job1","name":"test.jpg","digest":"f30fd292876e1e2af8bdff22b5df2237abdb83073575a065c12cf814b3071646","size":34516,"platform":null,"username":"","contentType":"image/jpeg","userAgent":"curl/7.52.1","labels":["search1","search2"],"properties":{"prop1":"value1"},"createdAt":1548036745850,"updatedAt":1548036745850,"id":"8365f12d66fb94de655bde3494b362326849ea2b8c3c471cad14d78d6721d1b7"}
 ```
+Note: The artifact is immutable except labels/properties but you can overwrite it by uploading it again with overwrite=true parameter
 
+### Update properties and labels
+```
+curl -X PUT -F "labels=brand1,brand2" -F "prop2=value2" http://localhost:8080/api/8365f12d66fb94de655bde3494b362326849ea2b8c3c471cad14d78d6721d1b7
+```
+returns
+```
+{"organization":"myorg","system":"bigsystem","subsystem":"job1","name":"test.jpg","digest":"f30fd292876e1e2af8bdff22b5df2237abdb83073575a065c12cf814b3071646","size":34516,"platform":null,"username":"","contentType":"image/jpeg","userAgent":"curl/7.52.1","labels":["brand1","brand2","search1","search2"],"properties":{"prop1":"value1","prop2":"value2"},"createdAt":1548036745850,"updatedAt":1548036745850,"id":"8365f12d66fb94de655bde3494b362326849ea2b8c3c471cad14d78d6721d1b7"}
+```
+**Note** You have to pass id of artifact such as 8365f12d66fb94de655bde3494b362326849ea2b8c3c471cad14d78d6721d1b7
 ### View Artifact metadata
 ```
-curl  http://localhost:8080/api/myapp/myjob/test.jpg
+curl  http://localhost:8080/api/8365f12d66fb94de655bde3494b362326849ea2b8c3c471cad14d78d6721d1b7
 ```
 returns
 ```
-{"application":"myapp","job":"myjob","name":"test.jpg","digest":"f30fd","platform":null,"contentType":"application/octet-stream","size":34516,"url":"http://127.0.0.1:9000/artifacts/temps/myapp/myjob/frog.png?X-Am..","userAgent":"curl/7.52.1","createdAt":"2019-01-20T05:04:10.508+0000","updatedAt":"2019-01-20T05:04:10.508+0000","labels":["search1","search2"],"properties":{"prop1":"value1"},"id":"myapp/myjob/test.jpg"}
+{"organization":"myorg","system":"bigsystem","subsystem":"job1","name":"test.jpg","digest":"f30fd292876e1e2af8bdff22b5df2237abdb83073575a065c12cf814b3071646","size":34516,"platform":null,"username":"","contentType":"image/jpeg","userAgent":"curl/7.52.1","labels":["brand1","brand2","search1","search2"],"properties":{"prop1":"value1","prop2":"value2"},"createdAt":1548036745850,"updatedAt":1548036745850,"id":"8365f12d66fb94de655bde3494b362326849ea2b8c3c471cad14d78d6721d1b7"}
 ```
 
 
-### View Artifact metadata for a job
+### View Artifact metadata for a org/system/subsystem
 ```
-curl  http://localhost:8080/api/myapp/myjob
+curl http://localhost:8080/api/myorg/bigsystem/job1
 ```
 returns
 ```
-[{"application":"myapp","job":"myjob","name":"test.jpg","digest":"f30fd","platform":null,"contentType":"application/octet-stream","size":34516,"url":"http://127.0.0.1:9000/artifacts/temps/myapp/myjob/frog.png?X-Am..","userAgent":"curl/7.52.1","createdAt":"2019-01-20T05:04:10.508+0000","updatedAt":"2019-01-20T05:04:10.508+0000","labels":["search1","search2"],"properties":{"prop1":"value1"},"id":"myapp/myjob/test.jpg"}]
+[{"organization":"myorg","system":"bigsystem","subsystem":"job1","name":"test.jpg","digest":"f30fd292876e1e2af8bdff22b5df2237abdb83073575a065c12cf814b3071646","size":34516,"platform":null,"username":"","contentType":"image/jpeg","userAgent":"curl/7.52.1","labels":["brand1","brand2","search1","search2"],"properties":{"prop1":"value1","prop2":"value2"},"createdAt":1548036745850,"updatedAt":1548036745850,"id":"8365f12d66fb94de655bde3494b362326849ea2b8c3c471cad14d78d6721d1b7"}]
 ```
+**Note**: Above API returns list of artifacts
 
 ### Download File
 ```
-curl  http://localhost:8080/api/myapp/myjob/test.jpg/download
+curl http://localhost:8080/api/8365f12d66fb94de655bde3494b362326849ea2b8c3c471cad14d78d6721d1b7/download
 ```
+**Note** You have to pass id of artifact such as 8365f12d66fb94de655bde3494b362326849ea2b8c3c471cad14d78d6721d1b7
 
 ### Query
 ```
-curl  http://localhost:8080/api?app=myapp
+curl http://localhost:8080/api?organization=myorg&subsystem=job1
 ```
 returns paginated result
 ```
-{"pageNumber":1,"pageSize":20,"totalRecords":1,"records":[{"application":"myapp","job":"myjob","name":"test.jpg","digest":"f30fd","platform":null,"contentType":"application/octet-stream","size":34516,"url":"http://127.0.0.1:9000/artifacts/temps/myapp/myjob/test.jpg?X-...","userAgent":"curl/7.52.1","createdAt":"2019-01-20T05:04:10.508+0000","updatedAt":"2019-01-20T05:04:10.508+0000","labels":["search1","search2"],"properties":{"prop1":"value1"},"id":"myapp/myjob/test.jpg"}]}
+{"pageNumber":1,"pageSize":20,"totalRecords":1,"records":[{"organization":"myorg","system":"bigsystem","subsystem":"job1","name":"test.jpg","digest":"f30fd292876e1e2af8bdff22b5df2237abdb83073575a065c12cf814b3071646","size":34516,"platform":null,"username":"","contentType":"image/jpeg","userAgent":"curl/7.52.1","labels":["brand1","brand2","search1","search2"],"properties":{"prop1":"value1","prop2":"value2"},"createdAt":1548036745850,"updatedAt":1548036745850,"id":"8365f12d66fb94de655bde3494b362326849ea2b8c3c471cad14d78d6721d1b7"}]}
 ```
-
 ### GraphQL
-WIP
+The endpoint is http://localhost:8080/api/gq
+Sample Query
+```
+{
+  query {
+    page
+    pageSize
+    totalRecords
+    records {
+      organization
+      system
+      subsystem
+      name
+      username
+      userAgent
+      name
+      labels
+      properties {
+        key
+        value
+      }
+    }
+  }
+}
+```
+Full Schema is available in github
 

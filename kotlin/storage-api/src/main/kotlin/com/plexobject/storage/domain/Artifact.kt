@@ -9,6 +9,8 @@ import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import org.apache.commons.lang3.StringUtils
 import org.springframework.data.util.ProxyUtils
 import java.io.Serializable
+import java.nio.charset.Charset
+import java.security.MessageDigest
 import java.util.*
 import javax.persistence.*
 
@@ -17,10 +19,13 @@ import javax.persistence.*
 @Table(name = "artifacts") //, schema = "fs")
 open class Artifact(
         @get:Column(nullable = false)
-        open var application: String = "",
+        open var organization: String = "",
 
         @get:Column(nullable = false)
-        open var job: String = "",
+        open var system: String = "",
+
+        @get:Column(nullable = false)
+        open var subsystem: String = "",
 
         @get:Column(nullable = false)
         open var name: String = "",
@@ -29,19 +34,27 @@ open class Artifact(
         open var digest: String = "",
 
         @get:Column(nullable = false)
+        open var size: Long = 0,
+
+        @get:Column(nullable = false)
         open var platform: String? = null,
+
+        @get:Column(name = "username", nullable = false)
+        open var username: String? = null,
 
         @get:Column(name = "content_type", nullable = false)
         open var contentType: String? = null,
 
-        @get:Column(nullable = false)
-        open var size: Long = 0,
-
-        @get:Transient
-        open var url: String? = null,
-
         @get:Column(name = "user_agent", nullable = false)
         open var userAgent: String? = null,
+
+        @get:Column(name = "labels", nullable = false)
+        @get:JsonSerialize(using = LabelsSerializer::class)
+        open var labels: String = "",
+
+        @get:OneToMany(mappedBy = "artifact", cascade = arrayOf(CascadeType.ALL), orphanRemoval = true, fetch = FetchType.EAGER)
+        @get:JsonSerialize(using = PropertySerializer::class)
+        open var properties: MutableSet<ArtifactProperty> = HashSet<ArtifactProperty>(),
 
         @get:JsonSerialize(using = DateSerializer::class)
         @get:Column(name = "created_at", nullable = true)
@@ -51,61 +64,20 @@ open class Artifact(
         @get:Column(name = "updated_at", nullable = true)
         open var updatedAt: Date = Date(),
 
-        @get:Column(name = "labels", nullable = false)
-        @get:JsonSerialize(using = LabelsSerializer::class)
-        //@Embedded
-        //open var labels: ArtifactLabels = ArtifactLabels.fromString(""),
-        open var labels: String = "",
-
-        @get:OneToMany(mappedBy = "artifact", cascade = arrayOf(CascadeType.ALL), orphanRemoval = true, fetch = FetchType.EAGER)
-        @get:JsonSerialize(using = PropertySerializer::class)
-        open var properties: MutableSet<ArtifactProperty> = HashSet<ArtifactProperty>()
-) : Serializable {
+        @get:Column(name = "id")
+        @get:Id
+        open var id: String = "") : Serializable {
     //
-    constructor(
-            application: String,
-            job: String,
-            name: String,
-            digest: String,
-            platform: String?,
-            contentType: String?,
-            size: Long,
-            url: String?,
-            userAgent: String?,
-            labels: String) :
-            this(
-                    application,
-                    job,
-                    name,
-                    digest,
-                    platform,
-                    contentType,
-                    size,
-                    url,
-                    userAgent,
-                    Date(),
-                    Date(),
-                    labels,
-                    HashSet<ArtifactProperty>()) {
-        initId()
+    init {
         val list = ArrayList<String>(stringToSet(labels))
         this.labels = StringUtils.join(list, ',')
-    }
-
-    @Column(name = "id")
-    @Id
-    fun getId(): String {
-        return initId()
-    }
-
-    fun setId(id: String) {
+        initId()
     }
 
     @JsonIgnore
     fun initId(): String {
-        val key = toKey(application, job, name)
-        setId(key)
-        return key
+        this.id = toKey(organization, system, subsystem, name)
+        return this.id
     }
 
     fun mergeLabels(other: Artifact) {
@@ -125,9 +97,6 @@ open class Artifact(
         return stringToSet(labels)
     }
 
-    private fun toKey(): String {
-        return "${application}:${job}:${name}"
-    }
 
     fun update(other: Artifact) {
         userAgent = other.userAgent
@@ -142,8 +111,9 @@ open class Artifact(
 
     fun validate() {
         check(size > 0) { "size must be greater than zero." }
-        check(application.isNotEmpty()) { "application is not specified." }
-        check(job.isNotEmpty()) { "job is not specified." }
+        check(organization.isNotEmpty()) { "organization is not specified." }
+        check(system.isNotEmpty()) { "system is not specified." }
+        check(subsystem.isNotEmpty()) { "subsystem is not specified." }
         check(name.isNotEmpty()) { "name is not specified." }
         check(digest.isNotEmpty()) { "digest is not specified." }
     }
@@ -153,7 +123,7 @@ open class Artifact(
         val all = getPropertiesAsMap() + Artifact.filterProperties(map)
         var props = mutableSetOf<ArtifactProperty>()
         all.forEach { k, v ->
-            val pid = "${getId()}:$k"
+            val pid = "${id}::$k"
             props.add(ArtifactProperty(this, pid, k, v, Date()))
         }
         this.properties.clear()
@@ -179,25 +149,27 @@ open class Artifact(
 
         other as Artifact
 
-        return this.getId() == other.getId()
+        return this.id == other.id
     }
 
     override fun hashCode(): Int {
-        return this.getId().hashCode()
+        return this.id.hashCode()
     }
 
     override fun toString(): String {
-        return "Artifact(id='${getId()}', application='$application', job='$job', name='$name', digest='$digest', platform=$platform, contentType='$contentType', size=$size, url='$url', userAgent='$userAgent', createdAt=$createdAt, updatedAt=$updatedAt, labels=$labels, properties=${properties})"
+        return "Artifact(organization='$organization', system='$system', subsystem='$subsystem', name='$name', digest='$digest', size=$size, platform=$platform, username=$username, contentType=$contentType, userAgent=$userAgent, labels='$labels', properties=$properties, createdAt=$createdAt, updatedAt=$updatedAt)"
     }
 
     companion object {
-        val application = "application"
-        val job = "job"
+        val organization = "organization"
+        val system = "system"
+        val subsystem = "subsystem"
         val name = "name"
         val platform = "platform"
         val labels = "labels"
         val digest = "digest"
         val userAgent = "userAgent"
+        val username = "username"
         val createdAt = "createdAt"
 
         fun stringToSet(str: String): Set<String> {
@@ -214,7 +186,7 @@ open class Artifact(
         }
 
         fun filterProperties(props: Map<String, String>): Map<String, String> {
-            val fieldsRegex = Regex("(app|application|job|name|platform|contentType|overwrite|label|labels|createdAt|updatedAt|size|url|userAgent|digest)", RegexOption.IGNORE_CASE)
+            val fieldsRegex = Regex("(org|organization|system|subsystem|name|platform|contentType|overwrite|label|labels|createdAt|updatedAt|size|url|userAgent|digest)", RegexOption.IGNORE_CASE)
             var newProps = TreeMap<String, String>()
             props.forEach { k, v ->
                 if (!fieldsRegex.matches(k)) { // containsMatchIn
@@ -228,11 +200,11 @@ open class Artifact(
             return str.replace("[^A-Za-z0-9 ._]/", "_");
         }
 
-        fun toKey(application: String, job: String, name: String): String {
-            check(application.isNotEmpty()) { "application is not specified." }
-            check(job.isNotEmpty()) { "job is not specified." }
-            check(name.isNotEmpty()) { "name is not specified." }
-            return "${normalize(application)}/${normalize(job)}/${normalize(name)}"
+        fun toKey(organization: String, system: String, subsystem: String, name: String): String {
+            val key = "${normalize(organization)}/${normalize(system)}/${normalize(subsystem)}/${normalize(name)}"
+            val md = MessageDigest.getInstance("SHA-256")
+            val digest = md.digest(key.toByteArray(Charset.forName("UTF-8")))
+            return digest.fold("", { str, it -> str + "%02x".format(it) }).toLowerCase()
         }
     }
 }

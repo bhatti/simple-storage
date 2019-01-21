@@ -25,13 +25,15 @@ SET default_with_oids = false;
 
 CREATE TABLE fs.artifacts (
     id character varying(255) NOT NULL,
-    application character varying(100) NOT NULL,
-    job character varying(100) NOT NULL,
+    organization character varying(100) NOT NULL,
+    system character varying(100) NOT NULL,
+    subsystem character varying(100) NOT NULL,
     name character varying(100) NOT NULL,
     digest character varying(100) NOT NULL,
     size bigint NOT NULL,
     platform character varying(100),
     content_type character varying(100),
+    username character varying(100),
     user_agent character varying(100),
     labels character varying(500) NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
@@ -86,31 +88,31 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: xartifact_app; Type: INDEX; Schema: fs; Owner: -
---
-
-CREATE INDEX xartifact_app ON fs.artifacts USING btree (application);
-
-
---
--- Name: xartifact_app_job; Type: INDEX; Schema: fs; Owner: -
---
-
-CREATE INDEX xartifact_app_job ON fs.artifacts USING btree (application, job);
-
-
---
--- Name: xartifact_app_job_name; Type: INDEX; Schema: fs; Owner: -
---
-
-CREATE UNIQUE INDEX xartifact_app_job_name ON fs.artifacts USING btree (application, job, name);
-
-
---
 -- Name: xartifact_digest; Type: INDEX; Schema: fs; Owner: -
 --
 
 CREATE INDEX xartifact_digest ON fs.artifacts USING btree (digest);
+
+
+--
+-- Name: xartifact_id; Type: INDEX; Schema: fs; Owner: -
+--
+
+CREATE UNIQUE INDEX xartifact_id ON fs.artifacts USING btree (organization, system, subsystem, name);
+
+
+--
+-- Name: xartifact_org; Type: INDEX; Schema: fs; Owner: -
+--
+
+CREATE INDEX xartifact_org ON fs.artifacts USING btree (organization);
+
+
+--
+-- Name: xartifact_org_system; Type: INDEX; Schema: fs; Owner: -
+--
+
+CREATE INDEX xartifact_org_system ON fs.artifacts USING btree (organization, system, subsystem);
 
 
 --
@@ -132,6 +134,13 @@ CREATE UNIQUE INDEX xartifact_props_key ON fs.properties USING btree (artifact_i
 --
 
 CREATE INDEX xartifact_uagent ON fs.artifacts USING btree (user_agent);
+
+
+--
+-- Name: xartifact_username; Type: INDEX; Schema: fs; Owner: -
+--
+
+CREATE INDEX xartifact_username ON fs.artifacts USING btree (username);
 
 
 --

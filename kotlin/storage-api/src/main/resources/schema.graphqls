@@ -1,0 +1,99 @@
+# A artifact stores metadata for files
+type Artifact {
+    # id defines artifact unique id
+    id: String
+    # organization name
+    organization: String
+    # system name
+    system: String
+    # subsystem name
+    subsystem: String
+    # artifact name
+    name: String
+    # digest of file
+    digest: String
+    # platform name
+    platform: String
+    # content-type
+    contentType: String
+    # size of file
+    size: Int
+    # username of sender
+    username: String
+    # user-agent of sender
+    userAgent: String
+    # created-at date in ISO format
+    createdAt: String
+    # updated-at date in ISO format
+    updatedAt: String
+    # list of searchable labels
+    labels: [String]
+    # properties of artifact
+    properties: [KeyValue]
+}
+
+# KeyValue defines key/value for properties
+type KeyValue {
+    # key name
+    key: String
+    # stringified value
+    value: String
+}
+
+# Query defines query operations for querying artifacts
+type Query {
+    # query returns list of artifacts that matches given filtering criteria
+    query(filter: QueryCriteria): QueryResult
+}
+
+# QueryCriteria defines properties for filtering query results of artifacts
+input QueryCriteria {
+    # page defines page number starting with 1
+    page: Int
+    # pageSize defines number of job records to return
+    pageSize: Int
+    # organization name
+    organization: String
+    # system name
+    system: String
+    # subsystem name
+    subsystem: String
+    # artifact name
+    name: String
+    # digest of file
+    digest: String
+    # platform name
+    platform: String
+    # content-type
+    contentType: String
+    # username for sender
+    username: String
+    # user-agent of sender
+    userAgent: String
+    # list of searchable labels
+    labels: [String]
+    # since date in ISO-format
+    since: String
+    # list of sort by fields, e.g. system DESC, platform ASC
+    sortedBy: [String]
+}
+
+# QueryResult defines paginated result
+type QueryResult {
+    # page defines page number starting with 1
+    page: Int
+    # pageSize defines number of job records to return
+    pageSize: Int
+    # total records that matched in the database
+    totalRecords: Int
+    # records
+    records: [Artifact]
+}
+
+# DateTime defines date-time format
+scalar DateTime
+
+# schema defines supported queries
+schema {
+    query: Query
+}

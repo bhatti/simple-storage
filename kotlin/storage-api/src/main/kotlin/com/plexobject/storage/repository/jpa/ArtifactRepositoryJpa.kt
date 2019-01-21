@@ -45,13 +45,12 @@ open class ArtifactRepositoryJpa(
     }
 
     @Transactional
-    override fun get(application: String, job: String, name: String) : Artifact {
-        val id = Artifact.toKey(application, job, name)
+    override fun get(id: String) : Artifact {
         val obj = super.findById(id)
         if (obj.isPresent) {
             return obj.get()
         } else {
-            throw NotFoundException("Could not find Artifact with app $application, job $job, name $name")
+            throw NotFoundException("Could not find Artifact with id $id")
         }
     }
 
@@ -59,9 +58,9 @@ open class ArtifactRepositoryJpa(
     override fun save(entity: Artifact, overwrite: Boolean): Artifact {
         entity.validate()
         try {
-            val old = get(entity.application, entity.job, entity.name)
+            val old = get(entity.id)
             if (!overwrite) {
-                throw DuplicateException("Already exist artifact with app ${entity.application}, job ${entity.job}, name ${entity.name}")
+                throw DuplicateException("Already exist artifact with id ${entity.id}")
             }
             old.update(entity)
             return super.save(old)
@@ -70,8 +69,9 @@ open class ArtifactRepositoryJpa(
         }
     }
 
-    override fun saveProperties(application: String, job: String, name: String, params: Map<String, String>): Artifact {
-        val old = get(application, job, name)
+    override fun saveProperties(id: String, labels: String, params: Map<String, String>): Artifact {
+        val old = get(id)
+        old.mergeLabels(Artifact.stringToSet(labels))
         old.addProperties(params)
         return super.save(old)
     }

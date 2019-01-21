@@ -5,13 +5,13 @@ import org.springframework.lang.Nullable
 import java.util.*
 
 data class PaginatedQuery(
-        val params: Map<String, String>,
         val pageNumber: Int = 1,
         val pageSize: Int = 20,
-        val sortProperties: Array<String> = arrayOf()) {
+        val params: Map<String, String>,
+        val sortedBy: Array<String> = arrayOf()) {
     fun toSort() : Sort {
         var order = mutableListOf<Sort.Order>()
-        for (prop in sortProperties) {
+        for (prop in sortedBy) {
             val propToks = prop.split(" ").map { it.trim() }.filter { it.isNotEmpty() }
             var dir: Optional<Sort.Direction> = Optional.empty()
             if (propToks.size >= 2) {

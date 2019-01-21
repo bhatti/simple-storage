@@ -36,16 +36,19 @@ open class ArtifactControllerTest() {
         val multipartFile = MockMultipartFile("file", "myfile",
                 "text/plain", data)
         val artifact = controller.upload(
-                "myapp",
-                "myjob",
-                false,
-                multipartFile,
-                listOf("mylabel1, mylabel2", "mylabel3"),
-                "myagent",
-                mapOf("app" to "newapp", "reportType" to "expenseReport", "author" to "bhatti", "platform" to ""))
+                org = "myorg",
+                system = "myapp",
+                subsystem = "myjob",
+                overwrite = false,
+                file = multipartFile,
+                labelList = listOf("mylabel1, mylabel2", "mylabel3"),
+                username = "myuser",
+                userAgent = "myagent",
+                params = mapOf("org" to "newapp", "reportType" to "expenseReport", "author" to "bhatti", "platform" to ""))
         Assert.assertEquals(data.size.toLong(), artifact.size)
-        Assert.assertEquals("myapp", artifact.application)
-        Assert.assertEquals("myjob", artifact.job)
+        Assert.assertEquals("myorg", artifact.organization)
+        Assert.assertEquals("myapp", artifact.system)
+        Assert.assertEquals("myjob", artifact.subsystem)
         Assert.assertEquals("myfile", artifact.name)
         Assert.assertEquals("", artifact.platform)
         Assert.assertEquals("text/plain", artifact.contentType)
@@ -58,11 +61,11 @@ open class ArtifactControllerTest() {
         Assert.assertEquals(2, props.size)
         Assert.assertEquals("bhatti", props.get("author"))
         Assert.assertEquals("expenseReport", props.get("reportType"))
-        val loaded = URL(artifact.url).readText(Charset.forName("UTF-8"))
+        val loaded = URL(controller.s3Helper.presignedUpload(artifact.id).toString()).readText(Charset.forName("UTF-8"))
         Assert.assertEquals(txt, loaded)
 
-        val resp = controller.download("myapp", "myjob", "myfile")
-        Assert.assertEquals(data.size, resp.body.size)
+        val resp = controller.download(artifact.id)
+        Assert.assertEquals(data.size, resp.body?.size)
     }
 
 
@@ -73,16 +76,19 @@ open class ArtifactControllerTest() {
         val multipartFile = MockMultipartFile("file", "myfile",
                 "text/plain", data)
         val artifact = controller.upload(
-                "myapp",
-                "myjob",
-                true,
-                multipartFile,
-                listOf("mylabel1, mylabel2", "mylabel3"),
-                "myagent",
-                mapOf("app" to "newapp", "reportType" to "expenseReport", "author" to "bhatti", "platform" to ""))
+                org = "myorg",
+                system = "myapp",
+                subsystem = "myjob",
+                overwrite = true,
+                file = multipartFile,
+                labelList = listOf("mylabel1, mylabel2", "mylabel3"),
+                username = "myuser",
+                userAgent = "myagent",
+                params = mapOf("org" to "newapp", "reportType" to "expenseReport", "author" to "bhatti", "platform" to ""))
         Assert.assertEquals(data.size.toLong(), artifact.size)
-        Assert.assertEquals("myapp", artifact.application)
-        Assert.assertEquals("myjob", artifact.job)
+        Assert.assertEquals("myorg", artifact.organization)
+        Assert.assertEquals("myapp", artifact.system)
+        Assert.assertEquals("myjob", artifact.subsystem)
         Assert.assertEquals("myfile", artifact.name)
         Assert.assertEquals("", artifact.platform)
         Assert.assertEquals("text/plain", artifact.contentType)
@@ -95,16 +101,18 @@ open class ArtifactControllerTest() {
         Assert.assertEquals(2, props.size)
         Assert.assertEquals("bhatti", props.get("author"))
         Assert.assertEquals("expenseReport", props.get("reportType"))
-        val loaded = URL(artifact.url).readText(Charset.forName("UTF-8"))
+        val loaded = URL(controller.s3Helper.presignedUpload(artifact.id).toString()).readText(Charset.forName("UTF-8"))
         Assert.assertEquals(txt, loaded)
         controller.upload(
-                "myapp",
-                "myjob",
-                true,
-                multipartFile,
-                listOf("mylabel1, mylabel2", "mylabel3"),
-                "myagent",
-                mapOf("app" to "newapp", "reportType" to "expenseReport", "author" to "bhatti", "platform" to ""))
+                org = "myorg",
+                system = "myapp",
+                subsystem = "myjob",
+                overwrite = true,
+                file = multipartFile,
+                labelList = listOf("mylabel1, mylabel2", "mylabel3"),
+                username = "myuser",
+                userAgent = "myagent",
+                params = mapOf("org" to "newapp", "reportType" to "expenseReport", "author" to "bhatti", "platform" to ""))
     }
 
 
@@ -114,18 +122,21 @@ open class ArtifactControllerTest() {
         val data = txt.toByteArray()
         val multipartFile = MockMultipartFile("file", "testfile",
                 "text/plain", data)
-        controller.upload(
-                "testapp",
-                "testjob",
-                false,
-                multipartFile,
-                listOf("testlabel1, testlabel2", "testlabel3"),
-                "myagent",
-                mapOf("app" to "newapp", "reportType" to "expenseReport", "author" to "john", "platform" to ""))
-        val artifact = controller.get("testapp", "testjob", "testfile")
+        val saved = controller.upload(
+                org = "testorg",
+                system = "testapp",
+                subsystem = "testjob",
+                overwrite = false,
+                file = multipartFile,
+                labelList = listOf("testlabel1, testlabel2", "testlabel3"),
+                username = "myuser",
+                userAgent = "myagent",
+                params = mapOf("org" to "newapp", "reportType" to "expenseReport", "author" to "john", "platform" to ""))
+        val artifact = controller.get(saved.id)
         Assert.assertEquals(data.size.toLong(), artifact.size)
-        Assert.assertEquals("testapp", artifact.application)
-        Assert.assertEquals("testjob", artifact.job)
+        Assert.assertEquals("testorg", artifact.organization)
+        Assert.assertEquals("testapp", artifact.system)
+        Assert.assertEquals("testjob", artifact.subsystem)
         Assert.assertEquals("testfile", artifact.name)
         Assert.assertEquals("", artifact.platform)
         Assert.assertEquals("text/plain", artifact.contentType)
@@ -135,111 +146,154 @@ open class ArtifactControllerTest() {
         Assert.assertTrue(labels.contains("testlabel2"))
         Assert.assertTrue(labels.contains("testlabel3"))
         val props = artifact.getPropertiesAsMap()
-        Assert.assertEquals(2, props.size)
+        Assert.assertEquals(props.toString(), 2, props.size)
         Assert.assertEquals("john", props.get("author"))
         Assert.assertEquals("expenseReport", props.get("reportType"))
+    }
+
+    @Test
+    fun testSaveProperties() {
+        val txt = "Test file 456."
+        val data = txt.toByteArray()
+        val multipartFile = MockMultipartFile("file", "testfile",
+                "text/plain", data)
+        val saved = controller.upload(
+                org = "testorg",
+                system = "testapp",
+                subsystem = "testjob",
+                overwrite = false,
+                file = multipartFile,
+                labelList = listOf("testlabel1, testlabel2", "testlabel3"),
+                username = "myuser",
+                userAgent = "myagent",
+                params = mapOf("org" to "newapp", "reportType" to "expenseReport", "author" to "john", "platform" to ""))
+        var artifact = controller.get(saved.id)
+        Assert.assertEquals(data.size.toLong(), artifact.size)
+        var labels = artifact.labelsAsSet()
+        Assert.assertEquals(3, labels.size)
+        var props = artifact.getPropertiesAsMap()
+        Assert.assertEquals(props.toString(), 2, props.size)
+        //
+        artifact = controller.saveProperties(saved.id, listOf("brand1,brand2", "brand3"), mapOf("appId" to "2434"))
+        labels = artifact.labelsAsSet()
+        Assert.assertEquals(6, labels.size)
+        props = artifact.getPropertiesAsMap()
+        Assert.assertEquals(props.toString(), 3, props.size)
     }
 
 
     @Test
     fun testQuery() {
-        for (app in arrayOf("qapp1", "qapp2")) {
-            for (job in arrayOf("qjob1", "qjob2", "qjob3")) {
-                for (k in 1..10) {
-                    val platform = if (k % 2 == 1) "IOS" else "ANDROID"
-                    val labels = if (k % 2 == 1) listOf("qlabel_${job}_${k}, qlabel2_${k}", "qlabel3") else listOf("plabel_${job}_${k}, plabel2_${k}", "plabel3")
-                    val data = "Test file k $k".toByteArray()
-                    val multipartFile = MockMultipartFile("file", "file${k}",
-                            "text/plain", data)
-                    controller.upload(
-                            app,
-                            job,
-                            false,
-                            multipartFile,
-                            labels,
-                            "myagent",
-                            mapOf("app" to "newapp", "reportType" to "expenseReport_${app}_${job}_${k}", "author" to "john_${k}", "platform" to platform))
+        for (org in arrayOf("org1", "org2")) {
+            for (system in arrayOf("system1", "system2")) {
+                for (subsystem in arrayOf("subsys1", "subsys2")) {
+                    for (k in 1..6) {
+                        val platform = if (k % 2 == 1) "IOS" else "ANDROID"
+                        val labels = if (k % 2 == 1) listOf("qlabel_${system}_${k}, qlabel2_${k}", "qlabel3") else listOf("plabel_${system}_${k}, plabel2_${k}", "plabel3")
+                        val data = "Test file k $k".toByteArray()
+                        val multipartFile = MockMultipartFile("file", "file${k}",
+                                "text/plain", data)
+                        controller.upload(
+                                org = org,
+                                system = system,
+                                subsystem = subsystem,
+                                overwrite = false,
+                                file = multipartFile,
+                                labelList = labels,
+                                username = "myuser",
+                                userAgent = "myagent",
+                                params = mapOf("org" to "newapp", "reportType" to "expenseReport_${system}_${subsystem}_${k}", "author" to "john_${k}", "platform" to platform))
+                    }
                 }
             }
         }
         //
         var result = controller.query(1, 20, listOf(), mapOf())
         Assert.assertEquals(20, result.records.size)
-        Assert.assertEquals(2*3*10, result.totalRecords)
-        result = controller.query(1, 20, listOf(), mapOf("app" to "qapp0"))
-        Assert.assertEquals(0, result.records.size)
-        Assert.assertEquals(0, result.totalRecords)
-        result = controller.query(1, 20, listOf(), mapOf("app" to "qapp1"))
+        Assert.assertEquals(2*2*2*6, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("org" to "org1"))
         Assert.assertEquals(20, result.records.size)
-        Assert.assertEquals(30, result.totalRecords)
-        result = controller.query(1, 20, listOf(), mapOf("app" to "qapp2"))
+        Assert.assertEquals(24, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("org" to "org2"))
         Assert.assertEquals(20, result.records.size)
-        Assert.assertEquals(30, result.totalRecords)
-        result = controller.query(1, 20, listOf(), mapOf("job" to "qjob1"))
+        Assert.assertEquals(24, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("system" to "system1"))
         Assert.assertEquals(20, result.records.size)
-        Assert.assertEquals(20, result.totalRecords)
-        result = controller.query(1, 20, listOf(), mapOf("job" to "qjob2"))
+        Assert.assertEquals(24, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("system" to "system2"))
         Assert.assertEquals(20, result.records.size)
-        Assert.assertEquals(20, result.totalRecords)
-        result = controller.query(1, 20, listOf(), mapOf("job" to "qjob3"))
+        Assert.assertEquals(24, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("subsystem" to "subsys1"))
         Assert.assertEquals(20, result.records.size)
-        Assert.assertEquals(20, result.totalRecords)
-        result = controller.query(1, 20, listOf(), mapOf("app" to "qapp1", "job" to "qjob1"))
-        Assert.assertEquals(10, result.records.size)
-        Assert.assertEquals(10, result.totalRecords)
+        Assert.assertEquals(24, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("subsystem" to "subsys1"))
+        Assert.assertEquals(20, result.records.size)
+        Assert.assertEquals(24, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("org" to "org1", "system" to "system1"))
+        Assert.assertEquals(12, result.records.size)
+        Assert.assertEquals(12, result.totalRecords)
         //
-        result = controller.query(1, 20, listOf(), mapOf("app" to "qapp1", "labels" to "Qlabel3"))
-        Assert.assertEquals(15, result.records.size)
-        Assert.assertEquals(15, result.totalRecords)
-        result = controller.query(1, 20, listOf(), mapOf("app" to "qapp1", "labels" to "Qlabel3,plabel3"))
+        result = controller.query(1, 20, listOf(), mapOf("org" to "org2", "system" to "system2"))
+        Assert.assertEquals(12, result.records.size)
+        Assert.assertEquals(12, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("org" to "org1", "labels" to "Qlabel3,plabel3"))
         Assert.assertEquals(20, result.records.size)
-        Assert.assertEquals(30, result.totalRecords)
+        Assert.assertEquals(24, result.totalRecords)
         //
-        result = controller.query(1, 20, listOf(), mapOf("app" to "qapp1", "platform" to "IOS"))
-        Assert.assertEquals(15, result.records.size)
-        Assert.assertEquals(15, result.totalRecords)
-        result = controller.query(1, 20, listOf(), mapOf("app" to "qapp1", "platform" to "ANDROID"))
-        Assert.assertEquals(15, result.records.size)
-        Assert.assertEquals(15, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("org" to "org2", "platform" to "IOS"))
+        Assert.assertEquals(12, result.records.size)
+        Assert.assertEquals(12, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("org" to "org2", "platform" to "ANDROID"))
+        Assert.assertEquals(12, result.records.size)
+        Assert.assertEquals(12, result.totalRecords)
         result = controller.query(1, 20, listOf(), mapOf("platform" to "ANDROID"))
         Assert.assertEquals(20, result.records.size)
-        Assert.assertEquals(30, result.totalRecords)
+        Assert.assertEquals(24, result.totalRecords)
         result = controller.query(1, 20, listOf(), mapOf("platform" to "LINUX"))
         Assert.assertEquals(0, result.records.size)
         Assert.assertEquals(0, result.totalRecords)
         result = controller.query(1, 20, listOf(), mapOf("userAgent" to "myagent"))
         Assert.assertEquals(20, result.records.size)
-        Assert.assertEquals(60, result.totalRecords)
+        Assert.assertEquals(48, result.totalRecords)
+        result = controller.query(1, 20, listOf(), mapOf("username" to "myuser"))
+        Assert.assertEquals(20, result.records.size)
+        Assert.assertEquals(48, result.totalRecords)
     }
 
     @Test
-    fun testJob() {
-        for (app in arrayOf("japp1", "japp2")) {
-            for (job in arrayOf("jjob1", "jjob2", "jjob3")) {
-                for (k in 1..10) {
-                    val platform = if (k % 2 == 1) "IOS" else "ANDROID"
-                    val labels = if (k % 2 == 1) listOf("qlabel_${job}_${k}, qlabel2_${k}", "qlabel3") else listOf("plabel_${job}_${k}, plabel2_${k}", "plabel3")
-                    val data = "Test file k $k".toByteArray()
-                    val multipartFile = MockMultipartFile("file", "file${k}",
-                            "text/plain", data)
-                    controller.upload(
-                            app,
-                            job,
-                            false,
-                            multipartFile,
-                            labels,
-                            "myagent",
-                            mapOf("app" to "newapp", "reportType" to "expenseReport_${app}_${job}_${k}", "author" to "john_${k}", "platform" to platform))
+    fun testSubsystem() {
+        for (org in arrayOf("xorg1", "xorg2")) {
+            for (system in arrayOf("xsystem1", "xsystem2")) {
+                for (subsystem in arrayOf("xsubsys1", "xsubsys2")) {
+                    for (k in 1..4) {
+                        val platform = if (k % 2 == 1) "IOS" else "ANDROID"
+                        val labels = if (k % 2 == 1) listOf("qlabel_${system}_${k}, qlabel2_${k}", "qlabel3") else listOf("plabel_${system}_${k}, plabel2_${k}", "plabel3")
+                        val data = "Test file k $k".toByteArray()
+                        val multipartFile = MockMultipartFile("file", "file${k}",
+                                "text/plain", data)
+                        controller.upload(
+                                org = org,
+                                system = system,
+                                subsystem = subsystem,
+                                overwrite = false,
+                                file = multipartFile,
+                                labelList = labels,
+                                username = "myuser",
+                                userAgent = "myagent",
+                                params = mapOf("org" to "newapp", "reportType" to "expenseReport_${system}_${subsystem}_${k}", "author" to "john_${k}", "platform" to platform))
+                    }
                 }
             }
         }
         //
-        for (app in arrayOf("japp1", "japp2")) {
-            for (job in arrayOf("jjob1", "jjob2", "jjob3")) {
-                var result = controller.job(app, job)
-                Assert.assertEquals(10, result.size)
-                result = controller.job(app, job + "x")
-                Assert.assertEquals(0, result.size)
+        for (org in arrayOf("xorg1", "xorg2")) {
+            for (system in arrayOf("xsystem1", "xsystem2")) {
+                for (subsystem in arrayOf("xsubsys1", "xsubsys2")) {
+                    var result = controller.subsystemArtifacts(org, system, subsystem)
+                    Assert.assertEquals(4, result.size)
+                    result = controller.subsystemArtifacts(org, system, subsystem + "x")
+                    Assert.assertEquals(0, result.size)
+                }
             }
         }
     }

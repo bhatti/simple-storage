@@ -26,11 +26,13 @@ data class ArtifactSpecification(val pq: PaginatedQuery) : Specification<Artifac
 
     override fun toPredicate(root: Root<Artifact>, query: CriteriaQuery<*>, builder: CriteriaBuilder): Predicate? {
         var topPredicate: Predicate? = null
-        val application: String? = pq.params.get("application") ?: pq.params.get("app")
-        val job: String? = pq.params.get("job")
+        val org: String? = pq.params.get("organization") ?: pq.params.get("org")
+        val system: String? = pq.params.get("system")
+        val subsystem: String? = pq.params.get("subsystem")
         val name: String? = pq.params.get("name")
         val platform: String? = pq.params.get("platform")
         val userAgent: String? = pq.params.get("userAgent")
+        val username: String? = pq.params.get("username")
         val digest: String? = pq.params.get("digest")
         var since: Date? = null
         pq.params.get("since")?.let {
@@ -41,14 +43,20 @@ data class ArtifactSpecification(val pq: PaginatedQuery) : Specification<Artifac
         }
         val labels: String? = pq.params.get("labels") ?: pq.params.get("label")
 
-        application?.let {
-            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.application), it))
+        org?.let {
+            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.organization), it))
         }
-        job?.let {
-            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.job), it))
+        system?.let {
+            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.system), it))
+        }
+        subsystem?.let {
+            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.subsystem), it))
         }
         userAgent?.let {
             topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.userAgent), it))
+        }
+        username?.let {
+            topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.username), it))
         }
         platform?.let {
             topPredicate = and(builder, topPredicate, builder.equal(root.get<String>(Artifact.platform), it.toUpperCase()))
