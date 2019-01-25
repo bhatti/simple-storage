@@ -23,18 +23,18 @@ open class ArtifactRepositoryJpa(
     //
     override fun query(pq: PaginatedQuery): PaginatedResult<Artifact> {
         val builder = em.criteriaBuilder
-        val query = builder.createQuery(Artifact::class.java)
-        val root = query.from(Artifact::class.java)
-        query.select(root)
+        val q = builder.createQuery(Artifact::class.java)
+        val root = q.from(Artifact::class.java)
+        q.select(root)
         val spec = ArtifactSpecification(pq)
-        query.orderBy(toOrders(pq.toSort(), root, builder))
+        q.orderBy(toOrders(pq.toSort(), root, builder))
         //
-        val predicate = spec.toPredicate(root, query, builder)
+        val predicate = spec.toPredicate(root, q, builder)
         if (predicate != null) {
-            query.where(predicate)
+            q.where(predicate)
         }
         //
-        val resultQuery = em.createQuery(query)
+        val resultQuery = em.createQuery(q)
         if (pq.pageNumber > 1) {
             resultQuery.setFirstResult((pq.pageNumber - 1) * pq.pageSize)
         }
@@ -52,6 +52,14 @@ open class ArtifactRepositoryJpa(
         } else {
             throw NotFoundException("Could not find Artifact with id $id")
         }
+    }
+
+
+    @Transactional
+    override fun delete(id: String) : Artifact {
+        val obj = get(id)
+        super.delete(obj)
+        return obj
     }
 
     @Transactional
@@ -78,15 +86,15 @@ open class ArtifactRepositoryJpa(
 
     private fun count(pq: PaginatedQuery): Long {
         val builder = em.criteriaBuilder
-        val query = builder.createQuery(Long::class.java)
-        val root = query.from(Artifact::class.java)
-        query.select(builder.count(root))
+        val q = builder.createQuery(Long::class.java)
+        val root = q.from(Artifact::class.java)
+        q.select(builder.count(root))
         val spec = ArtifactSpecification(pq)
-        val predicate = spec.toPredicate(root, query, builder)
+        val predicate = spec.toPredicate(root, q, builder)
         if (predicate != null) {
-            query.where(predicate)
+            q.where(predicate)
         }
-        return em.createQuery(query).getSingleResult()
+        return em.createQuery(q).getSingleResult()
     }
 }
 

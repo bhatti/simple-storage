@@ -14,10 +14,12 @@ import org.springframework.beans.factory.InitializingBean
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
+import org.springframework.boot.autoconfigure.domain.EntityScan
 import org.springframework.boot.web.servlet.ServletRegistrationBean
 import org.springframework.context.annotation.*
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.springframework.transaction.annotation.EnableTransactionManagement
+import org.springframework.web.servlet.config.annotation.EnableWebMvc
 import javax.persistence.EntityManager
 import javax.persistence.PersistenceContext
 import javax.sql.DataSource
@@ -25,12 +27,15 @@ import javax.sql.DataSource
 @Configuration
 @EnableTransactionManagement
 //@ComponentScan(basePackages = arrayOf("com.plexobject.storage"))
-@ComponentScan
 @EnableJpaRepositories("com.plexobject.storage.repository")
 @PropertySource("classpath:/application.properties")
 @ImportResource("classpath:/app-context.xml")
 @EnableAutoConfiguration
 @EnableMBeanExport
+//@EnableWebMvc
+//@ServletComponentScan
+@ComponentScan("com.plexobject.storage")
+@EntityScan("com.plexobject.storage.domain")
 open class StorageConfig : InitializingBean {
     private val logger = LoggerFactory.getLogger(StorageConfig::class.java)
 

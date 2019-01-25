@@ -32,6 +32,7 @@ open class TokenAuthenticationService(internal val secret: String, internal val 
     fun getAuthentication(request: HttpServletRequest): Authentication? {
         // for local UI access
         if ("0:0:0:0:0:0:0:1" == request.getRemoteHost() || "127.0.0.1" == request.getRemoteHost()) {
+            logger.info("Local Accessing API " + request.method + " " + request.getRequestURI() + ", remote " + request.getRemoteHost())
             return UsernamePasswordAuthenticationToken("", null, Collections.emptyList())
         }
 
@@ -40,27 +41,26 @@ open class TokenAuthenticationService(internal val secret: String, internal val 
         if (token == null) {
             token = request.getHeader(HEADER_STRING)
         }
-        logger.debug("Accessing API " + request.getRequestURI() + ", token " + token + ", remote "
+        logger.info("Remote Accessing API " + request.method + " " + request.getRequestURI() + ", token " + token + ", remote "
                 + request.getRemoteHost())
-        if (token != null) {
-            val isBasic = token!!.contains(BASIC_TOKEN)
-            token = token!!.replace(".*\\s".toRegex(), "")
+        token?.let {
+            val isBasic = it.contains(BASIC_TOKEN)
+            var tok = it.replace(".*\\s".toRegex(), "")
             if (isBasic) {
-                val asBytes = Base64.getDecoder().decode(token)
-                token = String(asBytes, Charset.forName("UTF-8"))
-                token = token!!.substring(0, token!!.indexOf(':'))
+                val asBytes = Base64.getDecoder().decode(tok)
+                tok = String(asBytes, Charset.forName("UTF-8"))
+                tok = tok.substring(0, tok.indexOf(':'))
             }
             try {
                 // parse the token.
-                val user = Jwts.parser().setSigningKey(secret).parseClaimsJws(token).body.subject
+                val user = Jwts.parser().setSigningKey(secret).parseClaimsJws(tok).body.subject
                 return if (user != null)
                     UsernamePasswordAuthenticationToken(user, null, Collections.emptyList())
                 else
                     null
             } catch (e: RuntimeException) {
-                logger.warn("Invalid token passed $token: $e")
+                logger.warn("Invalid token passed $tok: $e")
             }
-
         }
 
         logger.debug("Failed to authenticate API " + request.getRequestURI())

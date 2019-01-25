@@ -11,8 +11,8 @@ class Query : GraphQLRootResolver {
     @Autowired
     lateinit var artifactRepository: ArtifactRepository
 
-    fun query(filter: QueryCriteria?): QueryResult {
-        var filter = filter
+    fun query(afilter: QueryCriteria?): QueryResult {
+        var filter = afilter
         if (filter == null) {
             filter = QueryCriteria()
         }

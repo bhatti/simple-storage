@@ -6,27 +6,28 @@ import com.plexobject.storage.repository.ArtifactRepository
 import com.plexobject.storage.util.S3Helper
 import org.apache.commons.lang3.StringUtils
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.InitializingBean
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.stereotype.Component
 import org.springframework.test.context.ContextConfiguration
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.bind.annotation.ResponseBody
 import javax.transaction.Transactional
 
-
+@Component
 @RestController
-@ContextConfiguration(classes = [StorageConfig::class])
 @Transactional
-open class ArtifactController {
+open class ArtifactController: InitializingBean {
     private val logger = LoggerFactory.getLogger(ArtifactController::class.java)
     @Autowired
     lateinit var artifactRepository: ArtifactRepository
     @Autowired
-    lateinit var s3Helper: S3Helper
+    lateinit var storage: S3Helper
 
     @RequestMapping(value = arrayOf("/api/{org}/{system}/{subsystem}"), method = arrayOf(RequestMethod.POST), produces = arrayOf("application/json"))
     fun upload(
@@ -39,7 +40,8 @@ open class ArtifactController {
             @RequestHeader("username", defaultValue = "") username: String,
             @RequestHeader("User-Agent", defaultValue = "") userAgent: String,
             @RequestParam params: Map<String, String>): Artifact {
-        val name = file.originalFilename
+        var digest = storage.hash(file.bytes)
+        val name: String = file.originalFilename ?: digest
         val size: Long = file.bytes.size.toLong()
         check(org.isNotEmpty()) { "organization is not specified." }
         check(system.isNotEmpty()) { "system is not specified." }
@@ -47,9 +49,8 @@ open class ArtifactController {
         check(name.isNotEmpty()) { "name is not specified." }
         check(size > 0) { "size is zero." }
         //
-        var digest = s3Helper.hash(file.bytes)
         val key = Artifact.toKey(org, system, subsystem, name)
-        s3Helper.upload(key, file.bytes)
+        storage.upload(key, file.bytes)
         val labels: String = StringUtils.join(labelList, ',')
         val platform = params.get("platform")
         val contentType = file.contentType
@@ -90,12 +91,20 @@ open class ArtifactController {
         return artifactRepository.get(id)
     }
 
+
+    @RequestMapping(value = arrayOf("/api/{id}"), method = arrayOf(RequestMethod.DELETE), produces = arrayOf("application/json"))
+    @ResponseBody
+    fun delete(
+            @PathVariable(value = "id") id: String): Artifact {
+        return artifactRepository.delete(id)
+    }
+
     @RequestMapping(value = arrayOf("/api/{id}/download"), method = arrayOf(RequestMethod.GET))
     @ResponseBody
     fun download(
             @PathVariable(value = "id") id: String): ResponseEntity<ByteArray> {
         val artifact = artifactRepository.get(id)
-        val data = s3Helper.download(id)
+        val data: ByteArray = storage.download(id)
         val mediaType = MediaType.parseMediaType(artifact.contentType ?: "application/octet-stream")
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + artifact.name)
@@ -130,6 +139,10 @@ open class ArtifactController {
         return artifact
     }
 
+    fun presignedUrl(id: String) : String {
+        return storage.presignedUpload(id).toString()
+    }
+
     @ExceptionHandler(NotFoundException::class)
     fun handleStorageFileNotFound(_exc: NotFoundException): ResponseEntity<*> {
         return ResponseEntity.notFound().build<Any>()
@@ -138,5 +151,8 @@ open class ArtifactController {
     @ExceptionHandler(DuplicateException::class)
     fun handleStorageDuplicate(_exc: DuplicateException): ResponseEntity<*> {
         return ResponseEntity.status(HttpStatus.CONFLICT).build<Any>()
+    }
+
+    override fun afterPropertiesSet() {
     }
 }

@@ -1,12 +1,16 @@
 package com.plexobject.storage.api
 
 import com.plexobject.storage.StorageConfig
+import com.plexobject.storage.repository.ArtifactRepository
+import com.plexobject.storage.util.S3Helper
 import org.junit.Assert
+import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.runner.RunWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.context.annotation.ComponentScan
 import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.junit.jupiter.SpringExtension
@@ -24,10 +28,23 @@ import javax.transaction.Transactional
 @ContextConfiguration(classes = [StorageConfig::class])
 @AutoConfigureMockMvc
 open class ArtifactControllerTest() {
-    @Autowired
     lateinit var controller: ArtifactController
     @Autowired
+    lateinit var storage: S3Helper
+    @Autowired
+    lateinit var repository: ArtifactRepository
+    @Autowired
     private val mvc: MockMvc? = null
+
+    @Before
+    fun setup() {
+        // For some reason, autowiring controller nulls out internal properties of the controller
+        // so building it here explicitly and then overwriting autowired properties
+        controller = ArtifactController()
+        controller.storage = storage
+        controller.artifactRepository = repository
+    }
+
 
     @Test
     fun testUploadWithoutOverwrite() {
@@ -61,7 +78,7 @@ open class ArtifactControllerTest() {
         Assert.assertEquals(2, props.size)
         Assert.assertEquals("bhatti", props.get("author"))
         Assert.assertEquals("expenseReport", props.get("reportType"))
-        val loaded = URL(controller.s3Helper.presignedUpload(artifact.id).toString()).readText(Charset.forName("UTF-8"))
+        val loaded = URL(controller.presignedUrl(artifact.id)).readText(Charset.forName("UTF-8"))
         Assert.assertEquals(txt, loaded)
 
         val resp = controller.download(artifact.id)
@@ -101,7 +118,7 @@ open class ArtifactControllerTest() {
         Assert.assertEquals(2, props.size)
         Assert.assertEquals("bhatti", props.get("author"))
         Assert.assertEquals("expenseReport", props.get("reportType"))
-        val loaded = URL(controller.s3Helper.presignedUpload(artifact.id).toString()).readText(Charset.forName("UTF-8"))
+        val loaded = URL(controller.presignedUrl(artifact.id)).readText(Charset.forName("UTF-8"))
         Assert.assertEquals(txt, loaded)
         controller.upload(
                 org = "myorg",

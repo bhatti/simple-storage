@@ -40,7 +40,7 @@ open class ArtifactRepositoryJpaTest() {
             val label = labels[i % labels.size]
             val platform = platforms[i % platforms.size]
             val user = users[i % users.size]
-            var artifact1 = Artifact(
+            var artifact = Artifact(
                     organization = "myorg",
                     system = "myapp",
                     subsystem = "myjob_$i",
@@ -52,15 +52,15 @@ open class ArtifactRepositoryJpaTest() {
                     contentType = "application/json",
                     userAgent = "firefox",
                     labels = "expenses, quarterly, year$i, $label")
-            artifact1.createdAt = java.sql.Date.valueOf(jan1.plusDays(i.toLong()))
-            artifact1.addProperties(mapOf("key1$i" to "value1", "key2$i" to "value2", "index" to "$i"))
-            repository.save(artifact1, true)
+            artifact.createdAt = java.sql.Date.valueOf(jan1.plusDays(i.toLong()))
+            artifact.addProperties(mapOf("key1$i" to "value1", "key2$i" to "value2", "index" to "$i"))
+            repository.save(artifact, true)
         }
     }
 
     @Test
     fun createArtifact() {
-        var artifact1 = Artifact(
+        var artifact = Artifact(
                 organization = "org",
                 system = "system",
                 subsystem = "job",
@@ -73,13 +73,13 @@ open class ArtifactRepositoryJpaTest() {
                 userAgent = "firefox",
                 labels = "new_expenses, new_quarterly, new_2019 ")
         //
-        assertNotNull(artifact1.id)
-        assertEquals(Artifact.stringToSet("new_2019, new_expenses, new_quarterly").toString(), artifact1.labelsAsSet().toString())
+        assertNotNull(artifact.id)
+        assertEquals(Artifact.stringToSet("new_2019, new_expenses, new_quarterly").toString(), artifact.labelsAsSet().toString())
     }
 
     @Test
     fun testSave() {
-        var artifact1 = Artifact(
+        var artifact = Artifact(
                 organization = "neworg",
                 system = "newsystem",
                 subsystem = "newjob",
@@ -92,18 +92,45 @@ open class ArtifactRepositoryJpaTest() {
                 userAgent = "firefox",
                 labels = "new_expenses, new_quarterly, new_2019 ")
         //
-        artifact1.addProperties(mapOf("zkey1" to "value1", "zkey2" to "value2"))
+        artifact.addProperties(mapOf("zkey1" to "value1", "zkey2" to "value2"))
         //
-        repository.save(artifact1, true)
-        repository.save(artifact1, true) // multiple save should work
+        repository.save(artifact, true)
+        repository.save(artifact, true) // multiple save should work
 
-        val it = repository.get(artifact1.id)
-        assertArtifact(it, artifact1)
+        val it = repository.get(artifact.id)
+        assertArtifact(it, artifact)
+    }
+
+
+    @Test
+    fun testDelete() {
+        var artifact = Artifact(
+                organization = "delorg",
+                system = "delsystem",
+                subsystem = "deljob",
+                name = "IOS_APP",
+                digest = "ios-app-digest",
+                size = 1000,
+                platform = "IOS",
+                username = "deluser",
+                contentType = "application/json",
+                userAgent = "firefox",
+                labels = "del_expenses, del_quarterly, del_2019 ")
+        //
+        val props = mapOf("system" to "delsystem")
+        repository.save(artifact, false)
+        var result = repository.query(PaginatedQuery(1, 20, props))
+        assertEquals(1, result.records.size)
+        assertEquals(1, result.totalRecords)
+        val it = repository.delete(artifact.id)
+        result = repository.query(PaginatedQuery(1, 20, props))
+        assertEquals(0, result.records.size)
+        assertEquals(0, result.totalRecords)
     }
 
     @Test(expected = DuplicateException::class)
     fun testSavePropertiesWithoutOverwrite() {
-        var artifact1 = Artifact(
+        var artifact = Artifact(
                 organization = "xorg",
                 system = "xsystem",
                 subsystem = "xjob",
@@ -115,17 +142,17 @@ open class ArtifactRepositoryJpaTest() {
                 contentType = "application/json",
                 userAgent = "firefox",
                 labels = "new_expenses, new_quarterly, new_2019 ")
-        assertEquals(Artifact.stringToSet("new_expenses, new_quarterly, new_2019 ").toString(), artifact1.labelsAsSet().toString())
-        artifact1.addProperties(mapOf("zkey1" to "value1", "zkey2" to "value2"))
+        assertEquals(Artifact.stringToSet("new_expenses, new_quarterly, new_2019 ").toString(), artifact.labelsAsSet().toString())
+        artifact.addProperties(mapOf("zkey1" to "value1", "zkey2" to "value2"))
         //
-        repository.save(artifact1, false)
-        repository.save(artifact1, false)
+        repository.save(artifact, false)
+        repository.save(artifact, false)
     }
 
 
     @Test
     fun testSavePropertiesWithOverwrite() {
-        var artifact1 = Artifact(
+        var artifact = Artifact(
                 organization = "yorg",
                 system = "ysystem",
                 subsystem = "yjob",
@@ -138,14 +165,14 @@ open class ArtifactRepositoryJpaTest() {
                 userAgent = "firefox",
                 labels = "new_expenses, new_quarterly, new_2019 ")
         //
-        assertEquals(Artifact.stringToSet("new_expenses, new_quarterly, new_2019 ").toString(), artifact1.labelsAsSet().toString())
-        artifact1.addProperties(mapOf("zkey1" to "value1", "zkey2" to "value2"))
+        assertEquals(Artifact.stringToSet("new_expenses, new_quarterly, new_2019 ").toString(), artifact.labelsAsSet().toString())
+        artifact.addProperties(mapOf("zkey1" to "value1", "zkey2" to "value2"))
         //
-        repository.save(artifact1, true)
-        repository.save(artifact1, true) // multiple save should work
+        repository.save(artifact, true)
+        repository.save(artifact, true) // multiple save should work
 
-        var it = repository.get(artifact1.id)
-        assertArtifact(it, artifact1)
+        var it = repository.get(artifact.id)
+        assertArtifact(it, artifact)
         var props = it.getPropertiesAsMap()
         assertEquals("value1", props.get("zkey1"))
         assertEquals("value2", props.get("zkey2"))
@@ -153,23 +180,23 @@ open class ArtifactRepositoryJpaTest() {
         assertEquals(3, it.labelsAsSet().size)
 
         // update labels/properties
-        artifact1.mergeLabels(Artifact.stringToSet("new_check,new_month"))
-        assertEquals(Artifact.stringToSet("new_expenses, new_quarterly, new_2019,new_check,new_month ").toString(), artifact1.labelsAsSet().toString())
-        artifact1.addProperties(mapOf("xkey1" to "value1", "xkey2" to "value2"))
-        repository.save(artifact1, true) // multiple save should work
+        artifact.mergeLabels(Artifact.stringToSet("new_check,new_month"))
+        assertEquals(Artifact.stringToSet("new_expenses, new_quarterly, new_2019,new_check,new_month ").toString(), artifact.labelsAsSet().toString())
+        artifact.addProperties(mapOf("xkey1" to "value1", "xkey2" to "value2"))
+        repository.save(artifact, true) // multiple save should work
 
-        it = repository.get(artifact1.id)
-        assertArtifact(it, artifact1)
+        it = repository.get(artifact.id)
+        assertArtifact(it, artifact)
         props = it.getPropertiesAsMap()
         assertEquals("value1", props.get("xkey1"))
         assertEquals("value2", props.get("xkey2"))
         assertEquals(4, it.getPropertiesAsMap().size)
         assertEquals(5, it.labelsAsSet().size)
         //
-        repository.saveProperties(artifact1.id, "brand1,brand2", mapOf("ykey1" to "value1", "ykey2" to "value2"))
-        artifact1.labels = "new_quarterly,brand2,new_month,brand1,new_expenses,new_2019,new_check"
-        it = repository.get(artifact1.id)
-        assertArtifact(it, artifact1)
+        repository.saveProperties(artifact.id, "brand1,brand2", mapOf("ykey1" to "value1", "ykey2" to "value2"))
+        artifact.labels = "new_quarterly,brand2,new_month,brand1,new_expenses,new_2019,new_check"
+        it = repository.get(artifact.id)
+        assertArtifact(it, artifact)
         props = it.getPropertiesAsMap()
         assertEquals("value1", props.get("ykey1"))
         assertEquals("value2", props.get("ykey2"))

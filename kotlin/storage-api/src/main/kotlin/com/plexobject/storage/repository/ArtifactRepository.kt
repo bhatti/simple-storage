@@ -9,6 +9,7 @@ import org.springframework.data.repository.NoRepositoryBean
 @NoRepositoryBean
 interface ArtifactRepository {
     fun get(id: String): Artifact
+    fun delete(id: String): Artifact
     fun save(entity: Artifact, overwrite: Boolean): Artifact
     fun saveProperties(id: String, labels: String, params: Map<String, String>): Artifact
     fun query(query: PaginatedQuery): PaginatedResult<Artifact>

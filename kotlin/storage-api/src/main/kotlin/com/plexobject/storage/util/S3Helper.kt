@@ -27,20 +27,20 @@ open class S3Helper(
         var endpoint: String,
         val expirationMinutes: Long) {
 
-    private val awsCreds: BasicAWSCredentials
-    internal var prefix: String
+    lateinit var awsCreds: BasicAWSCredentials
+    val prefix: String
 
     init {
-        var prefix = prefix
         checkNotNull(accessKey, { "The accessKey id must be set." })
         checkNotNull(secretKey, { "The secretKey id must be set." })
         checkNotNull(bucket, { "The bucket id must be set." })
         checkNotNull(prefix, { "The prefix id must be set." })
         if (prefix.isNotEmpty() && !prefix.endsWith("/")) {
-            prefix = "$prefix/"
+            this.prefix = "$prefix/"
+        } else {
+            this.prefix = prefix
         }
         this.awsCreds = BasicAWSCredentials(accessKey.trim(), secretKey.trim())
-        this.prefix = prefix
         logger.info("*** S3 endpoint " + endpoint + ", bucket " + bucket + ", region " + region + ", prefix " + prefix
                 + ", key " + accessKey)
     }

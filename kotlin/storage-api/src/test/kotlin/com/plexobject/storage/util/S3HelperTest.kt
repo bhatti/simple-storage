@@ -69,7 +69,7 @@ open class S3HelperTest {
             `when`<S3ObjectInputStream>(s3Obj.getObjectContent()).thenReturn(mock<S3ObjectInputStream>(S3ObjectInputStream::class.java))
             `when`<S3Object>(s3.getObject(ArgumentMatchers.any(String::class.java), ArgumentMatchers.any(String::class.java))).thenReturn(s3Obj)
             try {
-                `when`<URL>(s3.generatePresignedUrl(ArgumentMatchers.any(GeneratePresignedUrlRequest::class.java!!)))
+                `when`<URL>(s3.generatePresignedUrl(ArgumentMatchers.any(GeneratePresignedUrlRequest::class.java)))
                         .thenReturn(URL("https://google.com"))
             } catch (e: Exception) {
             }

@@ -23,7 +23,7 @@ class FunctionalTest(unittest.TestCase):
     def upload_file(self, path):
         assert isabs (path)
         assert isfile (path)
-        subsys = random_string(30)
+        subsys = 'mysubsys' #random_string(30)
         server = '{}/myorg/mysystem/{}'.format(BASE_URL, subsys)
         logging.debug ('Uploading %r to %r', path, server)
         #
@@ -58,26 +58,26 @@ class FunctionalTest(unittest.TestCase):
 
     def test_get(self):
         server = '{}/{}'.format(BASE_URL, FunctionalTest.uploaded_artifact["id"])
-        response = urllib2.urlopen(server)
-        data = response.read()
+        resp = urllib2.urlopen(server)
+        data = resp.read()
         self.assertTrue('myorg' in data)
 
     def test_query(self):
         server = '{}?organization=myorg'.format(BASE_URL)
-        response = urllib2.urlopen(server)
-        data = response.read()
+        resp = urllib2.urlopen(server)
+        data = resp.read()
         self.assertTrue('myorg' in data)
 
     def test_query_fail(self):
         server = '{}?organization=xmyorg'.format(BASE_URL)
-        response = urllib2.urlopen(server)
-        data = response.read()
+        resp = urllib2.urlopen(server)
+        data = resp.read()
         self.assertFalse('myorg' in data)
 
     def test_download(self):
         server = '{}/{}/download'.format(BASE_URL, FunctionalTest.uploaded_artifact["id"])
-        response = urllib2.urlopen(server)
-        data = response.read()
+        resp = urllib2.urlopen(server)
+        data = resp.read()
         self.assertTrue('beginmyfile' in data)
 
     def test_save_properties(self):
